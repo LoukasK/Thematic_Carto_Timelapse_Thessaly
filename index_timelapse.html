@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Population Timelapse – Thessaly</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+  
+  <!-- MapLibre GL JS Library - provides the mapping functionality -->
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  
+  <style>
+    /* ========================================
+       CSS STYLES - Controls visual appearance
+       ======================================== */
+    
+    /* Make map fill entire browser window */
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+    
+    /* Legend box styling - positioned at bottom-left */
+    .legend-box {
+      position: absolute; 
+      bottom: 30px; 
+      left: 10px;
+      background-color: white; 
+      padding: 15px;
+      font-family: Arial, sans-serif; 
+      font-size: 13px;
+      border-radius: 5px; 
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+      z-index: 1; 
+      resize: both;        /* Allows user to drag corner and resize */
+      overflow: hidden;    /* Prevents content from spilling out */
+      min-width: 200px; 
+      min-height: 250px;
+      max-width: 600px; 
+      max-height: 85vh;    /* 85% of viewport height */
+    }
+    .legend-header { margin-bottom: 10px; }
+    .legend-content { 
+      width: 100%; 
+      height: calc(100% - 60px); 
+      overflow: visible; 
+    }
+    
+    /* Timeline control panel styling - positioned at bottom-right */
+    #timeline {
+      position: absolute; 
+      bottom: 30px; 
+      right: 10px;
+      background: white; 
+      padding: 12px 15px; 
+      border-radius: 5px;
+      font-family: Arial, sans-serif; 
+      font-size: 13px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3); 
+      z-index: 2; 
+      text-align: center;
+    }
+    
+    /* Slider controls */
+    #yearSlider, #speedSlider, #maxRadiusSlider, #opacitySlider { 
+      width: 180px; 
+      margin-top: 5px;
+    }
+    
+    /* Play/Pause button styling */
+    #playPauseBtn { 
+      margin-top: 8px; 
+      padding: 6px 12px; 
+      font-size: 13px;
+      cursor: pointer; 
+      border-radius: 3px;
+      border: 1px solid #ccc; 
+      background: #f5f5f5;
+    }
+    
+    /* Labels and values in control panel */
+    .control-label { 
+      font-size: 11px; 
+      color: #666; 
+      margin-top: 8px; 
+    }
+    .control-value { 
+      font-weight: bold; 
+      color: #333; 
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================
+       BASEMAP SELECTOR
+       STUDENTS: You can add more basemap options here
+       ======================================== -->
+  <select id="styleSelector" style="position:absolute;top:10px;left:10px;z-index:3;padding:5px;border-radius:3px;">
+    <option value="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json">Light</option>
+    <option value="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json">Dark</option>
+    <!-- STUDENTS: Add more basemap options like this:
+    <option value="URL_TO_BASEMAP_STYLE">Your Basemap Name</option>
+    -->
+  </select>
+
+  <!-- ========================================
+       LEGEND PANEL
+       User can drag corner to resize
+       ======================================== -->
+  <div id="legend" class="legend-box">
+    <div class="legend-header"><strong>Population (Municipal)</strong></div>
+    <div class="legend-content">
+      <!-- SVG will be dynamically created by JavaScript -->
+      <svg id="legendSvg" style="display: block; margin: 0 auto;"></svg>
+    </div>
+    <div style="text-align: right; font-size: 10px; color: #999; margin-top: 10px;">
+      💡 Drag corner to resize
+    </div>
+  </div>
+
+  <!-- ========================================
+       TIMELINE CONTROL PANEL
+       Contains all interactive controls
+       ======================================== -->
+  <div id="timeline">
+    <strong id="yearLabel">Year: 1991</strong><br>
+    
+    <!-- Year slider - manually select which year to display -->
+    <input type="range" min="0" max="3" value="0" id="yearSlider"><br>
+    
+    <!-- Play/Pause button for animation -->
+    <button id="playPauseBtn">▶ Play</button><br>
+    
+    <!-- Speed control - how fast animation plays -->
+    <div class="control-label">Speed (ms/frame):</div>
+    <input type="range" min="200" max="2000" value="1000" step="100" id="speedSlider">
+    <span class="control-value" id="speedLabel">1000</span> ms<br>
+    
+    <!-- Max circle radius - controls size of circles -->
+    <div class="control-label">Max Circle Radius (px):</div>
+    <input type="range" min="30" max="150" value="70" id="maxRadiusSlider">
+    <span class="control-value" id="maxRadiusValue">70</span> px<br>
+    
+    <!-- Opacity control - transparency of circles -->
+    <div class="control-label">Opacity:</div>
+    <input type="range" min="0" max="100" value="40" id="opacitySlider">
+    <span class="control-value" id="opacityValue">40</span>%
+  </div>
+
+  <!-- Map container - MapLibre will render the map here -->
+  <div id="map"></div>
+
+  <script>
+    // ============================================================
+    // CONFIGURATION SECTION
+    // ============================================================
+    // ⭐ STUDENTS: MODIFY THESE VALUES FOR YOUR PROJECT ⭐
+    // ============================================================
+    
+    // Define which columns in your GeoJSON contain population data for each year
+    // STUDENTS: Change these to match YOUR column names
+    const YEAR_COLUMNS = ['POP1991', 'POP2001', 'POP2011', 'POP2021'];
+    
+    // Define the actual years that correspond to each column
+    // STUDENTS: Change these to match YOUR time periods
+    const YEARS = [1991, 2001, 2011, 2021];
+    
+    // Path to your GeoJSON data file
+    // STUDENTS: Change this to point to YOUR data file
+    // For local development: use relative path like 'data_timelapse/your_file.geojson'
+    // For GitHub Pages: same relative path works
+    const DATA_PATH = 'data_timelapse/dimoi_poipop_WGS.geojson';
+    
+    // ============================================================
+    // MAP INITIALIZATION
+    // ============================================================
+    // Create the MapLibre map object
+    // STUDENTS: You can change center coordinates and zoom level here
+    let map = new maplibregl.Map({
+      container: 'map',           // HTML element to render map in
+      style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json', // Default basemap
+      center: [22.4, 39.6],       // [longitude, latitude] - CHANGE THIS to your study area
+      zoom: 8                     // Initial zoom level (0=world, 20=street level)
+    });
+
+    // ============================================================
+    // STATE VARIABLES
+    // ============================================================
+    // These variables track the current state of the application
+    let geojsonData = null;         // Stores the loaded GeoJSON data
+    let minPopulation = 0;          // Minimum population value across all years
+    let maxPopulation = 0;          // Maximum population value across all years
+    let intervalId = null;          // ID for the animation interval timer
+    let isPlaying = false;          // Whether animation is currently playing
+    let speed = 1000;               // Animation speed in milliseconds per frame
+    let maxRadius = 70;             // Maximum circle radius in pixels
+    let opacity = 0.4;              // Circle opacity (0.0 to 1.0)
+    let currentYearIndex = 0;       // Currently displayed year (0-3)
+
+    // ============================================================
+    // FUNCTION: loadData()
+    // ============================================================
+    // Loads the GeoJSON file and initializes the map
+    // This function is called automatically when the map finishes loading
+    function loadData() {
+      // Fetch the GeoJSON file from the specified path
+      fetch(DATA_PATH)
+        .then(response => {
+          // Check if file was found
+          if (!response.ok) throw new Error('Could not load data file');
+          return response.json();  // Parse JSON
+        })
+        .then(data => {
+          // Store the loaded data
+          geojsonData = data;
+          
+          // Calculate the range of population values across all years
+          calculatePopulationRange();
+          
+          // Add the population layer to the map
+          addPopulationLayer();
+          
+          // Display the first year (1991)
+          updateVisibleYear(0);
+          
+          // Generate the legend
+          updateLegend();
+          
+          // Log success message to console
+          console.log('Data loaded! Range:', minPopulation, '-', maxPopulation);
+        })
+        .catch(error => {
+          // Handle errors (file not found, invalid JSON, etc.)
+          console.error('Error:', error);
+          alert('Error loading: ' + DATA_PATH);
+        });
+    }
+
+    // ============================================================
+    // FUNCTION: calculatePopulationRange()
+    // ============================================================
+    // Finds the minimum and maximum population values across ALL years
+    // This ensures consistent circle sizing throughout the animation
+    function calculatePopulationRange() {
+      let allValues = [];  // Array to collect all population values
+      
+      // Loop through each feature (municipality) in the GeoJSON
+      geojsonData.features.forEach(feature => {
+        // Loop through each year column
+        YEAR_COLUMNS.forEach(column => {
+          const value = feature.properties[column];
+          // Only include valid numbers
+          if (value != null && !isNaN(value)) {
+            allValues.push(value);
+          }
+        });
+      });
+      
+      // Find the minimum and maximum values
+      minPopulation = Math.min(...allValues);
+      maxPopulation = Math.max(...allValues);
+    }
+
+    // ============================================================
+    // FUNCTION: addPopulationLayer()
+    // ============================================================
+    // Adds the circle layer to the map with Flannery scaling
+    function addPopulationLayer() {
+      const sourceId = 'population-source';
+      const layerId = 'population-layer';
+      
+      // Remove existing layer and source if they exist
+      // (This is important when changing basemaps)
+      if (map.getLayer(layerId)) map.removeLayer(layerId);
+      if (map.getSource(sourceId)) map.removeSource(sourceId);
+      
+      // Add the GeoJSON data as a source
+      map.addSource(sourceId, { 
+        type: 'geojson', 
+        data: geojsonData 
+      });
+      
+      // Add a circle layer that displays the points
+      map.addLayer({
+        id: layerId,
+        type: 'circle',            // Layer type: circles at point locations
+        source: sourceId,
+        paint: {
+          // STUDENTS: Change circle color here if desired
+          // Format: 'rgba(red, green, blue, alpha)' where values are 0-255 for RGB and 0-1 for alpha
+          'circle-color': 'rgba(255, 0, 0, 1)',  // Red color
+          'circle-opacity': opacity,              // Transparency
+          'circle-radius': getFlanneryExpression(YEAR_COLUMNS[0])  // Size based on first year
+        }
+      });
+    }
+
+    // ============================================================
+    // FUNCTION: getFlanneryExpression()
+    // ============================================================
+    // Creates a MapLibre expression for Flannery perceptual scaling
+    // 
+    // Flannery Formula: r = (value/maxValue)^0.57 × maxRadius
+    // 
+    // The 0.57 exponent is based on psychophysical research showing
+    // that humans underestimate area differences. This correction
+    // makes circles appear more proportional to their data values.
+    //
+    // STUDENTS: Do not modify this unless you understand MapLibre expressions
+    function getFlanneryExpression(columnName) {
+      return [
+        'let',                                    // Define variables
+        'value', ['get', columnName],            // Get population from specified column
+        'maxValue', maxPopulation,               // Set maximum value
+        [
+          '*',                                    // Multiply
+          [
+            '^',                                  // Power/exponent
+            ['/', ['var', 'value'], ['var', 'maxValue']],  // value/maxValue
+            0.57                                  // Flannery exponent
+          ],
+          maxRadius                               // Times maximum radius
+        ]
+      ];
+    }
+
+    // ============================================================
+    // FUNCTION: updateVisibleYear()
+    // ============================================================
+    // Updates the map to display a specific year
+    // Called when user moves the slider or animation plays
+    function updateVisibleYear(index) {
+      currentYearIndex = index;
+      const column = YEAR_COLUMNS[index];  // Get column name for this year
+      const year = YEARS[index];            // Get actual year value
+      
+      // Update the circle sizes to use the selected year's data
+      if (map.getLayer('population-layer')) {
+        map.setPaintProperty('population-layer', 'circle-radius', getFlanneryExpression(column));
+      }
+      
+      // Update the year label in the UI
+      document.getElementById('yearLabel').innerText = 'Year: ' + year;
+      document.getElementById('yearSlider').value = index;
+    }
+
+    // ============================================================
+    // FUNCTION: updateLegend()
+    // ============================================================
+    // Generates the legend showing three representative circle sizes
+    // 
+    // ⭐ STUDENTS: MODIFY THESE VALUES TO CHANGE LEGEND CATEGORIES ⭐
+    function updateLegend() {
+      const svg = document.getElementById('legendSvg');
+      
+      // ============================================================
+      // ⭐ STUDENTS: CHANGE THESE VALUES FOR YOUR DATA ⭐
+      // ============================================================
+      // Define the population thresholds shown in the legend
+      const smallValue = 10000;     // Small circle represents populations < 10,000
+      const mediumValue = 50000;    // Medium circle represents populations 10,000-50,000
+      const largeValue = Math.max(100000, maxPopulation);  // Large circle represents > 50,000
+      
+      // Define the text labels shown in the legend
+      const smallLabel = "< 10,000";
+      const mediumLabel = "10,000 - 50,000";
+      const largeLabel = "> 50,000";
+      // ============================================================
+      
+      // Calculate circle sizes using Flannery formula
+      // scaleFactor (0.4) makes circles smaller so they fit in legend box
+      const scaleFactor = 0.4;
+      const r1 = Math.pow(smallValue / maxPopulation, 0.57) * maxRadius * scaleFactor;
+      const r2 = Math.pow(mediumValue / maxPopulation, 0.57) * maxRadius * scaleFactor;
+      const r3 = Math.pow(largeValue / maxPopulation, 0.57) * maxRadius * scaleFactor;
+      
+      // Calculate SVG dimensions
+      const centerX = 70;  // X position for circle centers
+      const svgHeight = r3 * 2 + r2 * 2 + r1 * 2 + 100;  // Total height needed
+      const svgWidth = Math.max(200, r3 * 2 + 120);       // Total width needed
+      
+      svg.setAttribute('width', svgWidth);
+      svg.setAttribute('height', svgHeight);
+      
+      // Calculate Y positions (bottom to top)
+      const y3 = svgHeight - r3 - 20;      // Large circle at bottom
+      const y2 = y3 - r3 - r2 - 20;        // Medium circle in middle
+      const y1 = y2 - r2 - r1 - 20;        // Small circle at top
+      
+      // Generate SVG content with circles and labels
+      svg.innerHTML = `
+        <circle cx="${centerX}" cy="${y3}" r="${r3}" fill="rgba(255,0,0,${opacity})" stroke="red" stroke-width="1.5"/>
+        <text x="${centerX + r3 + 10}" y="${y3 + 5}" font-size="12" fill="#333">${largeLabel}</text>
+        <circle cx="${centerX}" cy="${y2}" r="${r2}" fill="rgba(255,0,0,${opacity})" stroke="red" stroke-width="1.5"/>
+        <text x="${centerX + r2 + 10}" y="${y2 + 5}" font-size="12" fill="#333">${mediumLabel}</text>
+        <circle cx="${centerX}" cy="${y1}" r="${r1}" fill="rgba(255,0,0,${opacity})" stroke="red" stroke-width="1.5"/>
+        <text x="${centerX + r1 + 10}" y="${y1 + 5}" font-size="12" fill="#333">${smallLabel}</text>
+      `;
+    }
+
+    // ============================================================
+    // EVENT HANDLERS - User Interface Controls
+    // ============================================================
+    // These functions respond to user interactions with the controls
+    
+    // Year slider - manually select which year to display
+    document.getElementById('yearSlider').addEventListener('input', () => {
+      updateVisibleYear(parseInt(document.getElementById('yearSlider').value));
+    });
+
+    // Speed slider - adjust animation speed
+    document.getElementById('speedSlider').addEventListener('input', (e) => {
+      speed = parseInt(e.target.value);
+      document.getElementById('speedLabel').innerText = speed;
+      
+      // If animation is playing, restart it with new speed
+      if (isPlaying) {
+        clearInterval(intervalId);
+        intervalId = setInterval(playNextFrame, speed);
+      }
+    });
+
+    // Max radius slider - adjust circle sizes
+    document.getElementById('maxRadiusSlider').addEventListener('input', (e) => {
+      maxRadius = parseInt(e.target.value);
+      document.getElementById('maxRadiusValue').innerText = maxRadius;
+      
+      // Update map and legend with new sizes
+      if (geojsonData) {
+        updateVisibleYear(currentYearIndex);
+        updateLegend();
+      }
+    });
+
+    // Opacity slider - adjust circle transparency
+    document.getElementById('opacitySlider').addEventListener('input', (e) => {
+      opacity = parseInt(e.target.value) / 100;  // Convert 0-100 to 0.0-1.0
+      document.getElementById('opacityValue').innerText = e.target.value;
+      
+      // Update circle opacity on map
+      if (map.getLayer('population-layer')) {
+        map.setPaintProperty('population-layer', 'circle-opacity', opacity);
+      }
+      
+      // Update legend to match
+      if (geojsonData) updateLegend();
+    });
+
+    // ============================================================
+    // ANIMATION CONTROLS
+    // ============================================================
+    
+    // Play/Pause button - start/stop animation
+    document.getElementById('playPauseBtn').addEventListener('click', () => {
+      // Check if data is loaded
+      if (!geojsonData) { 
+        alert('Load data first!'); 
+        return; 
+      }
+      
+      if (!isPlaying) {
+        // Start animation
+        isPlaying = true;
+        document.getElementById('playPauseBtn').innerText = '⏸ Pause';
+        intervalId = setInterval(playNextFrame, speed);  // Call playNextFrame every 'speed' milliseconds
+      } else {
+        // Stop animation
+        isPlaying = false;
+        document.getElementById('playPauseBtn').innerText = '▶ Play';
+        clearInterval(intervalId);  // Stop the interval
+      }
+    });
+
+    // FUNCTION: playNextFrame()
+    // Advances to the next year in the sequence
+    // When it reaches the last year, it loops back to the first
+    function playNextFrame() {
+      const nextIndex = (currentYearIndex + 1) % YEARS.length;  // Loop back to 0 after last year
+      updateVisibleYear(nextIndex);
+    }
+
+    // ============================================================
+    // BASEMAP SWITCHER
+    // ============================================================
+    // Allows user to change the background map style
+    document.getElementById('styleSelector').addEventListener('change', (e) => {
+      map.setStyle(e.target.value);  // Apply new basemap style
+      
+      // When basemap changes, all layers are removed
+      // This event listener re-adds our population layer
+      map.once('styledata', () => {
+        if (geojsonData) {
+          addPopulationLayer();
+          updateVisibleYear(currentYearIndex);
+        }
+      });
+    });
+
+    // ============================================================
+    // MAP INITIALIZATION
+    // ============================================================
+    // When the map finishes loading, automatically load the data
+    map.on('load', () => loadData());
+
+    // ============================================================
+    // END OF CODE
+    // ============================================================
+    // 
+    // STUDENTS: Quick Reference for Customization
+    // 
+    // 1. DATA FILE (Line 154):
+    //    Change DATA_PATH to point to your GeoJSON file
+    //
+    // 2. YEAR COLUMNS (Lines 147-151):
+    //    Update YEAR_COLUMNS and YEARS arrays to match your data
+    //
+    // 3. MAP CENTER (Lines 162-163):
+    //    Change center coordinates and zoom for your study area
+    //
+    // 4. LEGEND VALUES (Lines 355-363):
+    //    Modify smallValue, mediumValue, largeValue for your data range
+    //    Update smallLabel, mediumLabel, largeLabel text
+    //
+    // 5. CIRCLE COLOR (Line 271):
+    //    Change 'circle-color' value
+    //    Format: 'rgba(red, green, blue, alpha)'
+    //    Example: 'rgba(0, 0, 255, 1)' for blue
+    //
+    // 6. BASEMAP OPTIONS (Lines 122-126):
+    //    Add more basemap choices in the dropdown
+    //
+    // ============================================================
+  </script>
+</body>
+</html>
