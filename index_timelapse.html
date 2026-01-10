@@ -283,12 +283,13 @@
      1. CONFIGURATION - Settings you MUST change for your project
      2. MAP INITIALIZATION - Creates the map object
      3. STATE VARIABLES - Tracks current application state
-     4. DATA LOADING - Fetches and processes GeoJSON file
-     5. FLANNERY SCALING - Calculates perceptually accurate circle sizes
-     6. VISUALIZATION - Updates map display for each year
-     7. LEGEND GENERATION - Creates dynamic legend with circle examples
-     8. EVENT HANDLERS - Responds to user interactions
-     9. ANIMATION CONTROLS - Manages play/pause functionality
+     4. DATA LOADING - Fetches and processes GeoJSON files
+     5. BOUNDARY LAYER - Adds municipality boundaries to map
+     6. FLANNERY SCALING - Calculates perceptually accurate circle sizes
+     7. VISUALIZATION - Updates map display for each year
+     8. LEGEND GENERATION - Creates dynamic legend with circle examples
+     9. EVENT HANDLERS - Responds to user interactions
+     10. ANIMATION CONTROLS - Manages play/pause functionality
      
      Students: Focus on sections marked with 🌍 (mandatory changes)
      and 🗺️ (optional styling changes)
@@ -324,7 +325,7 @@
   const YEARS = [1991, 2001, 2011, 2021];
   
   /**
-   * DATA_PATH: Location of your GeoJSON file
+   * DATA_PATH: Location of your GeoJSON file with point data (population centroids)
    * 🌍 STUDENTS: Change this to point to YOUR data file
    * 
    * For local development:
@@ -340,6 +341,18 @@
    */
   const DATA_PATH = 'data_timelapse/dimoi_poipop_WGS.geojson';
   
+  /**
+   * BOUNDARIES_PATH: Location of your GeoJSON file with polygon boundaries
+   * 🌍 STUDENTS: Change this to point to YOUR boundary file
+   * 
+   * This file should contain polygon geometries that define the boundaries
+   * of your municipalities, districts, or administrative areas.
+   * 
+   * The boundaries will be displayed as outlined polygons beneath the 
+   * population circles, providing geographic context.
+   */
+  const BOUNDARIES_PATH = 'data_timelapse/dimoi_oria_WGS.geojson';
+
   // ============================================================
   // 2. MAP INITIALIZATION
   // ============================================================
@@ -379,6 +392,7 @@
   // They are updated as the user interacts with the map
   
   let geojsonData = null;         // Stores the loaded GeoJSON data (null until loaded)
+  let boundariesData = null;      // Stores the loaded boundary polygons (null until loaded)
   let minPopulation = 0;          // Minimum population value across ALL years (for scaling)
   let maxPopulation = 0;          // Maximum population value across ALL years (for scaling)
   let intervalId = null;          // ID for the animation timer (needed to stop animation)
@@ -391,61 +405,79 @@
   // ============================================================
   // 4. DATA LOADING FUNCTIONS
   // ============================================================
-  // These functions load and process the GeoJSON data file
+  // These functions load and process the GeoJSON data files
   
   /**
    * loadData()
-   * Main function that loads the GeoJSON file and initializes the visualization
+   * Main function that loads BOTH the population points and boundary polygons
    * 
    * Process:
-   * 1. Fetch the GeoJSON file from DATA_PATH
-   * 2. Parse the JSON data
-   * 3. Calculate min/max population values
-   * 4. Add the circles to the map
-   * 5. Display the first year
-   * 6. Generate the legend
+   * 1. Fetch the population points GeoJSON file from DATA_PATH
+   * 2. Fetch the boundary polygons GeoJSON file from BOUNDARIES_PATH
+   * 3. Parse both JSON files
+   * 4. Calculate min/max population values
+   * 5. Add the boundary polygons to the map (underneath)
+   * 6. Add the circles to the map (on top)
+   * 7. Display the first year
+   * 8. Generate the legend
    * 
    * This function is called automatically when the map finishes loading
    */
   function loadData() {
-    console.log('Loading data from:', DATA_PATH);
+    console.log('Loading population data from:', DATA_PATH);
+    console.log('Loading boundaries data from:', BOUNDARIES_PATH);
     
-    // Fetch = JavaScript function to download files from the internet
-    fetch(DATA_PATH)
-      .then(response => {
-        // Check if file was found (404 error, etc.)
+    // Use Promise.all to load BOTH files simultaneously
+    // This is faster than loading them one after another
+    Promise.all([
+      // Load population points
+      fetch(DATA_PATH).then(response => {
         if (!response.ok) {
-          throw new Error('Could not load data file. Check that the path is correct.');
+          throw new Error('Could not load population data file. Check that the path is correct.');
         }
-        return response.json();  // Parse the text as JSON
+        return response.json();
+      }),
+      
+      // Load boundary polygons
+      fetch(BOUNDARIES_PATH).then(response => {
+        if (!response.ok) {
+          throw new Error('Could not load boundaries data file. Check that the path is correct.');
+        }
+        return response.json();
       })
-      .then(data => {
-        // Data loaded successfully!
-        console.log('Data loaded successfully. Features:', data.features.length);
-        
-        // Store the data in our global variable
-        geojsonData = data;
-        
-        // Calculate the range of values across all years
-        calculatePopulationRange();
-        
-        // Add the circles to the map
-        addPopulationLayer();
-        
-        // Show the first year (index 0)
-        updateVisibleYear(0);
-        
-        // Create the legend
-        updateLegend();
-        
-        // Log info to console for debugging
-        console.log('Population range:', minPopulation, 'to', maxPopulation);
-      })
-      .catch(error => {
-        // Something went wrong - file not found, invalid JSON, etc.
-        console.error('Error loading data:', error);
-        alert('Error loading data from: ' + DATA_PATH + '\n\nCheck:\n- File path is correct\n- File exists\n- File is valid GeoJSON');
-      });
+    ])
+    .then(([populationData, boundaryData]) => {
+      // Both files loaded successfully!
+      console.log('Population data loaded successfully. Features:', populationData.features.length);
+      console.log('Boundaries data loaded successfully. Features:', boundaryData.features.length);
+      
+      // Store the data in our global variables
+      geojsonData = populationData;
+      boundariesData = boundaryData;
+      
+      // Calculate the range of values across all years
+      calculatePopulationRange();
+      
+      // IMPORTANT: Add layers in correct order (bottom to top)
+      // 1. First add boundaries (will appear underneath)
+      // 2. Then add population circles (will appear on top)
+      addBoundariesLayer();
+      addPopulationLayer();
+      
+      // Show the first year (index 0)
+      updateVisibleYear(0);
+      
+      // Create the legend
+      updateLegend();
+      
+      // Log info to console for debugging
+      console.log('Population range:', minPopulation, 'to', maxPopulation);
+    })
+    .catch(error => {
+      // Something went wrong - file not found, invalid JSON, etc.
+      console.error('Error loading data:', error);
+      alert('Error loading data!\n\n' + error.message + '\n\nCheck:\n- File paths are correct\n- Files exist\n- Files are valid GeoJSON');
+    });
   }
 
   /**
@@ -488,14 +520,113 @@
   }
 
   // ============================================================
-  // 5. FLANNERY SCALING & VISUALIZATION
+  // 5. BOUNDARY LAYER ADDITION
+  // ============================================================
+  // These functions add municipality boundary polygons to the map
+  
+  /**
+   * addBoundariesLayer()
+   * Adds the boundary polygons as an outline layer beneath the population circles
+   * 
+   * 📚 BACKGROUND: Why add boundaries?
+   * 
+   * Boundaries provide geographic context by showing the actual shapes and
+   * extents of municipalities or administrative areas. Without boundaries,
+   * users only see circles floating in space. With boundaries, users can:
+   * - Understand the geographic extent of each municipality
+   * - See where municipality borders meet
+   * - Better relate the data to familiar geographic areas
+   * 
+   * LAYER ORDERING:
+   * MapLibre draws layers in the order they're added, so:
+   * 1. Basemap tiles (bottom)
+   * 2. Boundary polygons (we add this first)
+   * 3. Population circles (we add this second, so it appears on top)
+   * 
+   * 🗺️ STUDENTS: You can customize the boundary appearance by modifying
+   * the 'paint' properties in this function:
+   * - line-color: Color of the boundary lines
+   * - line-width: Thickness of the boundary lines
+   * - line-opacity: Transparency of the boundary lines
+   * 
+   * Process:
+   * 1. Remove any existing boundary layer (important when changing basemaps)
+   * 2. Add boundaries GeoJSON as a data source
+   * 3. Add a line layer that draws the polygon outlines
+   * 4. Style the lines to match your map's aesthetic
+   */
+  function addBoundariesLayer() {
+    const sourceId = 'boundaries-source';  // Internal ID for data source
+    const layerId = 'boundaries-layer';    // Internal ID for visible layer
+    
+    // Remove existing layer and source if they exist
+    // This is necessary when switching basemaps
+    if (map.getLayer(layerId)) {
+      map.removeLayer(layerId);
+      console.log('Removed existing boundaries layer');
+    }
+    if (map.getSource(sourceId)) {
+      map.removeSource(sourceId);
+      console.log('Removed existing boundaries source');
+    }
+    
+    // Add the boundaries GeoJSON data as a source
+    // A source provides data but doesn't display anything yet
+    map.addSource(sourceId, { 
+      type: 'geojson',        // Tells MapLibre this is GeoJSON format
+      data: boundariesData    // Our loaded boundary polygons
+    });
+    
+    // Add a layer that displays the polygon outlines
+    // Type 'line' draws the boundaries of polygons as lines
+    map.addLayer({
+      id: layerId,              // Layer ID
+      type: 'line',             // Layer type: draws lines along polygon edges
+      source: sourceId,         // Which source to get data from
+      paint: {                  // Visual styling properties
+        // 🗺️ STUDENTS: CUSTOMIZE BOUNDARY APPEARANCE HERE
+        // 
+        // line-color: The color of the boundary lines
+        // Format: 'rgb(red, green, blue)' or 'rgba(red, green, blue, alpha)' or hex '#RRGGBB'
+        // Examples:
+        //   - White: 'rgb(255, 255, 255)' or '#FFFFFF'
+        //   - Black: 'rgb(0, 0, 0)' or '#000000'
+        //   - Gray: 'rgb(128, 128, 128)' or '#808080'
+        //   - Blue: 'rgb(0, 100, 255)' or '#0064FF'
+        //   - Cyan: 'rgb(0, 255, 255)' or '#00FFFF'
+        'line-color': 'rgb(0, 255, 255)',  // Cyan color (matches your other map)
+        
+        // line-width: Thickness of the boundary lines in pixels
+        // Range: Typically 0.5 to 5
+        // Examples:
+        //   - Very thin: 0.5
+        //   - Thin: 1
+        //   - Medium: 2
+        //   - Thick: 3-5
+        'line-width': 1.5,                  // Medium thickness
+        
+        // line-opacity: Transparency of the boundary lines
+        // Range: 0.0 (invisible) to 1.0 (fully solid)
+        // Examples:
+        //   - Subtle: 0.3-0.5
+        //   - Normal: 0.6-0.8
+        //   - Strong: 0.9-1.0
+        'line-opacity': 0.6                 // Moderately visible
+      }
+    });
+    
+    console.log('Added boundaries layer');
+  }
+
+  // ============================================================
+  // 6. FLANNERY SCALING & VISUALIZATION
   // ============================================================
   // These functions handle the mathematical calculations for circle sizes
   // and display the circles on the map
   
   /**
    * addPopulationLayer()
-   * Adds the circle layer to the map
+   * Adds the circle layer to the map (on top of boundaries)
    * 
    * Process:
    * 1. Remove any existing layer (important when changing basemaps)
@@ -633,7 +764,7 @@
   }
 
   // ============================================================
-  // 6. LEGEND GENERATION
+  // 7. LEGEND GENERATION
   // ============================================================
   // Creates the visual legend showing three representative circle sizes
   
@@ -725,7 +856,7 @@
   }
 
   // ============================================================
-  // 7. EVENT HANDLERS - User Interface Controls
+  // 8. EVENT HANDLERS - User Interface Controls
   // ============================================================
   // These functions respond to user interactions with sliders, buttons, etc.
   // Each "addEventListener" watches for a specific user action
@@ -792,7 +923,7 @@
   });
 
   // ============================================================
-  // 8. ANIMATION CONTROLS
+  // 9. ANIMATION CONTROLS
   // ============================================================
   // Functions that handle the play/pause animation feature
   
@@ -847,7 +978,7 @@
   }
 
   // ============================================================
-  // 9. BASEMAP SWITCHER
+  // 10. BASEMAP SWITCHER
   // ============================================================
   // Allows user to change the background map style
   
@@ -856,7 +987,10 @@
    * When user selects a different basemap style, apply it
    * 
    * IMPORTANT: Changing the basemap removes all layers!
-   * We must re-add our population layer after the new style loads.
+   * We must re-add BOTH our boundary layer AND population layer 
+   * after the new style loads.
+   * 
+   * The order matters: boundaries first, then population circles on top.
    */
   document.getElementById('styleSelector').addEventListener('change', (e) => {
     const newStyle = e.target.value;  // Get selected basemap URL
@@ -865,19 +999,21 @@
     
     map.setStyle(newStyle);  // Apply new basemap style
     
-    // Wait for new style to finish loading, then re-add our layer
+    // Wait for new style to finish loading, then re-add our layers
     map.once('styledata', () => {
-      console.log('New basemap loaded, re-adding population layer');
+      console.log('New basemap loaded, re-adding layers');
       
-      if (geojsonData) {
-        addPopulationLayer();            // Re-add circles
+      if (geojsonData && boundariesData) {
+        // Add in correct order: boundaries first, then population circles
+        addBoundariesLayer();                // Bottom layer
+        addPopulationLayer();                // Top layer
         updateVisibleYear(currentYearIndex);  // Show current year
       }
     });
   });
 
   // ============================================================
-  // 10. INITIALIZATION
+  // 11. INITIALIZATION
   // ============================================================
   // Start the application when the map finishes loading
   
@@ -888,16 +1024,17 @@
    */
   map.on('load', () => {
     console.log('Map loaded, initializing application...');
-    loadData();  // Start loading GeoJSON data
+    loadData();  // Start loading both GeoJSON files
   });
 
   // Log application info to console
   console.log('='.repeat(60));
-  console.log('Population Timelapse Map - Initialized');
+  console.log('Population Timelapse Map with Boundaries - Initialized');
   console.log('Configuration:');
   console.log('  Years:', YEARS);
   console.log('  Columns:', YEAR_COLUMNS);
-  console.log('  Data Path:', DATA_PATH);
+  console.log('  Population Data Path:', DATA_PATH);
+  console.log('  Boundaries Data Path:', BOUNDARIES_PATH);
   console.log('='.repeat(60));
 
   // ============================================================
@@ -911,12 +1048,13 @@
      
      📚 WHAT YOU NEED TO MODIFY (🌍 = MANDATORY):
      
-     1. DATA CONFIGURATION (Lines ~184-207):
-        🌍 YEAR_COLUMNS - Column names in your GeoJSON
+     1. DATA CONFIGURATION (Lines ~285-340):
+        🌍 YEAR_COLUMNS - Column names in your population GeoJSON
         🌍 YEARS - Actual year values
-        🌍 DATA_PATH - Path to your GeoJSON file
+        🌍 DATA_PATH - Path to your population points GeoJSON file
+        🌍 BOUNDARIES_PATH - Path to your boundary polygons GeoJSON file
      
-     2. MAP SETTINGS (Lines ~209-216):
+     2. MAP SETTINGS (Lines ~342-365):
         🌍 center - [longitude, latitude] for your study area
         🌍 zoom - Initial zoom level (8-12 typical for regions)
      
@@ -925,13 +1063,18 @@
         🌍 Data source credit
         🌍 Your name and institution
      
-     4. LEGEND VALUES (Lines ~420-450):
+     4. LEGEND VALUES (Lines ~668-698):
         🌍 smallValue, mediumValue, largeValue - Population thresholds
         🌍 smallLabel, mediumLabel, largeLabel - Text descriptions
      
-     5. STYLING (🗺️ = OPTIONAL):
-        🗺️ Circle color (Line ~313) - 'rgba(255,0,0,1)'
-        🗺️ Legend circle colors (Lines ~465-473) - fill and stroke
+     5. BOUNDARY STYLING (Lines ~525-563):
+        🗺️ line-color - Color of boundary lines (default: cyan)
+        🗺️ line-width - Thickness of boundaries (default: 1.5px)
+        🗺️ line-opacity - Transparency of boundaries (default: 0.6)
+     
+     6. OTHER STYLING (🗺️ = OPTIONAL):
+        🗺️ Circle color (Line ~593) - 'rgba(255,0,0,1)'
+        🗺️ Legend circle colors (Lines ~745-753) - fill and stroke
         🗺️ Title styling (Lines ~45-88 in CSS) - fonts, sizes, colors
         🗺️ Basemap options (Lines ~145-151) - add more choices
      
@@ -939,44 +1082,66 @@
      
      🐛 TROUBLESHOOTING:
      
-     Problem: Map shows but no circles appear
+     Problem: Map shows but no circles or boundaries appear
      Solution: 
      - Open browser console (F12 → Console tab)
-     - Check for error messages
-     - Verify DATA_PATH is correct
-     - Ensure GeoJSON file exists at that location
+     - Check for error messages about file loading
+     - Verify DATA_PATH and BOUNDARIES_PATH are correct
+     - Ensure both GeoJSON files exist at those locations
+     - Check that file paths use correct relative or absolute paths
      
-     Problem: Circles appear but sizes are wrong
+     Problem: Boundaries appear but circles don't (or vice versa)
      Solution:
-     - Check YEAR_COLUMNS match your GeoJSON exactly (case-sensitive!)
-     - Verify your GeoJSON has numeric population values
-     - Adjust maxValueApprox if circles are too small/large
+     - Check console for errors about specific file
+     - Verify the problematic GeoJSON file is valid
+     - Test file at https://geojson.io/
+     - Ensure column names in YEAR_COLUMNS match your data exactly
+     
+     Problem: Boundaries appear in wrong color
+     Solution:
+     - Find line-color in addBoundariesLayer() function (around line 545)
+     - Change 'rgb(0, 255, 255)' to your desired color
+     - Use rgb(red, green, blue) format where values are 0-255
+     
+     Problem: Boundaries too thick/thin or too faint/strong
+     Solution:
+     - Adjust line-width (around line 556) - try values from 0.5 to 3
+     - Adjust line-opacity (around line 568) - try values from 0.3 to 1.0
      
      Problem: Animation doesn't work
      Solution:
      - Ensure YEARS array has same length as YEAR_COLUMNS
      - Check yearSlider max value matches number of years - 1
+     - Verify all year columns exist in your population GeoJSON
      
-     Problem: Legend shows wrong values
+     Problem: After changing basemap, layers disappear
      Solution:
-     - Modify smallValue, mediumValue, largeValue (lines ~420-425)
-     - These should match your actual data range
+     - This is normal behavior - the code re-adds them automatically
+     - If they don't reappear, check console for errors
+     - Verify both GeoJSON files are still accessible
      
      ============================================================
      
      📖 UNDERSTANDING THE CODE FLOW:
      
-     1. Map loads → 'load' event fires (line ~549)
-     2. loadData() called → Fetches GeoJSON file
+     1. Map loads → 'load' event fires (line ~929)
+     2. loadData() called → Fetches BOTH GeoJSON files simultaneously
      3. calculatePopulationRange() → Finds min/max values
-     4. addPopulationLayer() → Creates circles on map
-     5. updateVisibleYear(0) → Shows first year
-     6. updateLegend() → Generates legend SVG
+     4. addBoundariesLayer() → Creates boundary outlines (bottom layer)
+     5. addPopulationLayer() → Creates circles (top layer)
+     6. updateVisibleYear(0) → Shows first year
+     7. updateLegend() → Generates legend SVG
+     
+     Layer ordering (bottom to top):
+     1. Basemap tiles
+     2. Municipality boundaries (cyan outlines)
+     3. Population circles (red circles with size representing population)
      
      User interactions:
      - Slider moved → updateVisibleYear() → Recalculates circles
      - Play clicked → setInterval() → playNextFrame() every X ms
      - Settings changed → Updates applied immediately
+     - Basemap changed → Both layers re-added in correct order
      
      ============================================================
      
@@ -984,25 +1149,54 @@
      
      - MapLibre GL Documentation: https://maplibre.org/maplibre-gl-js/docs/
      - GeoJSON Specification: https://geojson.org/
+     - GeoJSON Validator: https://geojson.io/
      - Finding Coordinates: https://www.google.com/maps (right-click any location)
      - Color Picker: https://htmlcolorcodes.com/
+     - RGB Color Guide: https://www.rapidtables.com/web/color/RGB_Color.html
      - Flannery Scaling Paper: https://doi.org/10.1080/00087041.1971.10471835
      
      ============================================================
      
      💡 TIPS FOR SUCCESS:
      
-     1. Always work with a copy of your original file
-     2. Test your GeoJSON in https://geojson.io/ before using it
-     3. Use browser console (F12) to see helpful error messages
-     4. Start with default settings, then customize gradually
-     5. Keep your GeoJSON files small (<5MB) for fast loading
-     6. Use meaningful column names in your data
+     1. Always work with a copy of your original files
+     2. Test BOTH GeoJSON files in https://geojson.io/ before using them
+     3. Ensure boundaries file has Polygon or MultiPolygon geometries
+     4. Ensure population file has Point geometries with population columns
+     5. Use browser console (F12) to see helpful error messages
+     6. Start with default settings, then customize gradually
+     7. Keep your GeoJSON files small (<5MB each) for fast loading
+     8. Use meaningful column names in your data
+     9. When choosing boundary colors, consider contrast with:
+        - Your chosen basemap (light vs dark)
+        - Your circle colors
+        - The overall aesthetic you want
+     
+     ============================================================
+     
+     🎨 CUSTOMIZATION EXAMPLES:
+     
+     Example 1: Make boundaries more visible on dark basemap
+     - Increase line-width to 2 or 2.5
+     - Increase line-opacity to 0.8 or 0.9
+     - Keep cyan color or change to white: 'rgb(255, 255, 255)'
+     
+     Example 2: Make boundaries subtle on light basemap
+     - Decrease line-width to 1 or 0.8
+     - Decrease line-opacity to 0.4 or 0.5
+     - Use dark gray: 'rgb(100, 100, 100)'
+     
+     Example 3: Match boundaries to circle color theme
+     - If circles are red, use pink boundaries: 'rgb(255, 100, 100)'
+     - If circles are blue, use light blue boundaries: 'rgb(100, 150, 255)'
+     
+     Example 4: Create a glowing boundary effect
+     - Add line-blur property in paint object
+     - Set line-width to 3
+     - Set line-opacity to 0.7
+     - Use bright color like cyan or yellow
      
      ============================================================
 -->
 </body>
 </html>
-
-
-
