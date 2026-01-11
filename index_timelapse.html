@@ -592,9 +592,9 @@
         //   - White: 'rgb(255, 255, 255)' or '#FFFFFF'
         //   - Black: 'rgb(0, 0, 0)' or '#000000'
         //   - Gray: 'rgb(128, 128, 128)' or '#808080'
+        //   - Light Gray: 'rgb(200, 200, 200)' or '#C8C8C8'
         //   - Blue: 'rgb(0, 100, 255)' or '#0064FF'
-        //   - Cyan: 'rgb(0, 255, 255)' or '#00FFFF'
-        'line-color': 'rgb(0, 255, 255)',  // Cyan color (matches your other map)
+        'line-color': 'rgb(200, 200, 200)',  // Light grey color
         
         // line-width: Thickness of the boundary lines in pixels
         // Range: Typically 0.5 to 5
@@ -1100,7 +1100,7 @@
      Problem: Boundaries appear in wrong color
      Solution:
      - Find line-color in addBoundariesLayer() function (around line 545)
-     - Change 'rgb(0, 255, 255)' to your desired color
+     - Change 'rgb(200, 200, 200)' to your desired color
      - Use rgb(red, green, blue) format where values are 0-255
      
      Problem: Boundaries too thick/thin or too faint/strong
@@ -1134,7 +1134,7 @@
      
      Layer ordering (bottom to top):
      1. Basemap tiles
-     2. Municipality boundaries (cyan outlines)
+     2. Municipality boundaries (light grey outlines)
      3. Population circles (red circles with size representing population)
      
      User interactions:
@@ -1179,12 +1179,12 @@
      Example 1: Make boundaries more visible on dark basemap
      - Increase line-width to 2 or 2.5
      - Increase line-opacity to 0.8 or 0.9
-     - Keep cyan color or change to white: 'rgb(255, 255, 255)'
+     - Change to brighter color like white: 'rgb(255, 255, 255)'
      
-     Example 2: Make boundaries subtle on light basemap
+     Example 2: Make boundaries more subtle on light basemap
      - Decrease line-width to 1 or 0.8
      - Decrease line-opacity to 0.4 or 0.5
-     - Use dark gray: 'rgb(100, 100, 100)'
+     - Use darker gray: 'rgb(150, 150, 150)'
      
      Example 3: Match boundaries to circle color theme
      - If circles are red, use pink boundaries: 'rgb(255, 100, 100)'
