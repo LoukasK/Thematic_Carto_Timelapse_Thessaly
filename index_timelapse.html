@@ -213,9 +213,8 @@
     
     <!-- Author and institution information -->
     <div class="legend-author">
-      <strong>Data source:</strong> Hellenic Statistical Authority - Population data 1991-2021<br>
+       <strong>Data source:</strong> Hellenic Statistical Authority - Population data 1991-2021<br>
       <strong>Produced by:</strong> Loukas Katikas<br>
-      <strong>Student ID:</strong> XXX<br>
       National Technical University of Athens (NTUA)<br>
       School of Rural, Surveying & Geoinformatics Engineering<br>
       Cartography Laboratory<br>
@@ -224,12 +223,22 @@
   </div>
   
   <!-- Legend section title -->
-  <div class="legend-section-title">Population (Proportional symbols)</div>
+  <div class="legend-section-title">Population (Municipal)</div>
   
   <!-- Legend content - SVG circles will be dynamically created by JavaScript -->
   <!-- This is where the three representative circles will appear -->
   <div class="legend-content">
     <svg id="legendSvg" style="display: block; margin: 0 auto;"></svg>
+  </div>
+  
+  <hr style="border: none; border-top: 1px solid #eee; margin: 12px 0;">
+  
+  <!-- Municipal boundaries legend item -->
+  <div style="display: flex; align-items: center; margin-top: 8px;">
+    <svg width="40" height="18" style="margin-right: 8px;">
+      <line x1="0" y1="9" x2="40" y2="9" stroke="rgb(200, 200, 200)" stroke-width="1.5"/>
+    </svg>
+    <div style="font-size: 12px;">Municipal boundaries</div>
   </div>
   
   <!-- User hint for resizing -->
@@ -1201,5 +1210,3 @@
 -->
 </body>
 </html>
-
-
