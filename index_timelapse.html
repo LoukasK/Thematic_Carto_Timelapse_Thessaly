@@ -487,7 +487,10 @@
         return valB - valA;  // Descending order: largest first, smallest last
       });
       
+      // Debug: Log first and last features to verify sorting
       console.log('Sorted features by population (largest first) for proper rendering order');
+      console.log('First feature (largest):', populationData.features[0].properties[YEAR_COLUMNS[0]]);
+      console.log('Last feature (smallest):', populationData.features[populationData.features.length - 1].properties[YEAR_COLUMNS[0]]);
       
       // Store the data in our global variables
       geojsonData = populationData;
