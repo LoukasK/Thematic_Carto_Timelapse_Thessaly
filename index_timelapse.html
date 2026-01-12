@@ -192,7 +192,7 @@
        🌍 STUDENTS: MODIFY THE TEXT BELOW TO CUSTOMIZE YOUR MAP'S TITLE AND CREDITS
        
        What to change:
-       1. Main title: Change "THESSALY POPULATION  1991 - 2021" to your study area and time period
+       1. Main title: Change "THESSALY POPULATION CHANGE 1991 - 2021" to your study area and time period
        2. Data source: Update "Hellenic Statistical Authority" to your actual data source
        3. Your name: Change "Loukas Katikas" to your name
        4. Institution: Update university, school, laboratory, course, and academic year
@@ -207,7 +207,7 @@
   <div class="legend-header-title">
     <!-- Main map title -->
     <div class="legend-map-title">
-      THESSALY POPULATION<br>
+      THESSALY POPULATION CHANGE<br>
       1991 - 2021
     </div>
     
@@ -238,7 +238,7 @@
     <svg width="40" height="18" style="margin-right: 8px;">
       <line x1="0" y1="9" x2="40" y2="9" stroke="rgb(200, 200, 200)" stroke-width="1.5"/>
     </svg>
-    <div style="font-size: 12px;"> Municipal boundaries</div>
+    <div style="font-size: 12px;">Municipal boundaries</div>
   </div>
   
   <!-- User hint for resizing -->
@@ -776,18 +776,49 @@
   // ============================================================
   // 7. LEGEND GENERATION
   // ============================================================
-  // Creates the visual legend showing three representative circle sizes
+  // Creates the visual legend showing FOUR nested circle sizes
   
   /**
    * updateLegend()
-   * Generates the SVG legend showing example circles
+   * Generates the SVG legend showing FOUR nested circles
    * 
-   * The legend shows three circles representing:
-   * - Small populations (e.g., < 10,000)
-   * - Medium populations (e.g., 10,000 - 50,000)
-   * - Large populations (e.g., > 50,000)
+   * 📚 BACKGROUND: Nested Circle Legend
    * 
-   * 🌍 STUDENTS: Modify the values inside this function to match your data
+   * The legend shows FOUR concentric circles (one inside the other) representing:
+   * - 1,000 people (smallest, innermost)
+   * - 10,000 people
+   * - 50,000 people
+   * - 100,000 people (largest, outermost)
+   * 
+   * All circles:
+   * - Share the same center point (creating nested/concentric appearance)
+   * - Have NO fill (fill="none") - only red outlines are visible
+   * - Are drawn from LARGEST to SMALLEST (back to front)
+   * - Use dashed lines connecting center to each circle's edge for clarity
+   * 
+   * Why this design?
+   * - Shows relative sizes at a glance
+   * - Compact - takes less space than stacked circles
+   * - Clear - all circles visible simultaneously
+   * - Professional - commonly used in cartography
+   * 
+   * 🎨 BLENDING BEHAVIOR NOTE:
+   * Since circles have no fill (fill="none"), there is NO color blending.
+   * Only the red outlines (stroke) are visible, so overlapping doesn't
+   * create darker or lighter areas. Each circle's outline remains pure red.
+   * 
+   * If circles HAD fill colors (e.g., fill="rgba(255,0,0,0.3)"), then:
+   * - Overlapping areas would blend/combine the colors
+   * - Multiple transparent reds would create darker red where they overlap
+   * - This can obscure the individual circle sizes
+   * - That's why we use fill="none" - keeps each circle distinct!
+   * 
+   * Drawing order matters for visibility:
+   * - Largest circle (r4) drawn first → appears in BACK
+   * - Smallest circle (r1) drawn last → appears in FRONT
+   * - This ensures all circles are visible (front circles not hidden by back ones)
+   * 
+   * 🌍 STUDENTS: Modify the values below to match your data range
    */
   function updateLegend() {
     const svg = document.getElementById('legendSvg');
@@ -795,74 +826,113 @@
     // ============================================================
     // 🌍 STUDENTS: CHANGE THESE VALUES TO MATCH YOUR DATA RANGE
     // ============================================================
-    // These are the population thresholds shown in the legend
+    // These are the population values shown in the legend
     // Adjust them to make sense for your study area
     
-    const smallValue = 10000;     // Small municipalities (< 10,000 people)
-    const mediumValue = 50000;    // Medium municipalities (10,000 - 50,000 people)
-    const largeValue = Math.max(100000, maxPopulation);  // Large (> 50,000 people)
+    const value1 = 1000;      // Smallest circle
+    const value2 = 10000;     // Small-medium circle
+    const value3 = 50000;     // Medium-large circle
+    const value4 = 100000;    // Largest circle
     
-    // Define the text labels that appear next to each circle
-    const smallLabel = "< 10,000";
-    const mediumLabel = "10,000 - 50,000";
-    const largeLabel = "> 50,000";
+    // Define the text labels that appear for each circle
+    const label1 = "1,000";
+    const label2 = "10,000";
+    const label3 = "50,000";
+    const label4 = "100,000";
     
     // Examples for different contexts:
     // 
     // For rural areas with small populations:
-    // const smallValue = 1000;
-    // const mediumValue = 5000;
-    // const largeValue = Math.max(10000, maxPopulation);
-    // const smallLabel = "< 1,000";
-    // const mediumLabel = "1,000 - 5,000";
-    // const largeLabel = "> 5,000";
+    // const value1 = 500;
+    // const value2 = 2000;
+    // const value3 = 5000;
+    // const value4 = 10000;
+    // const label1 = "500"; const label2 = "2,000"; const label3 = "5,000"; const label4 = "10,000";
     //
     // For metropolitan areas with large populations:
-    // const smallValue = 100000;
-    // const mediumValue = 500000;
-    // const largeValue = Math.max(1000000, maxPopulation);
-    // const smallLabel = "< 100,000";
-    // const mediumLabel = "100,000 - 500,000";
-    // const largeLabel = "> 500,000";
+    // const value1 = 50000;
+    // const value2 = 100000;
+    // const value3 = 500000;
+    // const value4 = 1000000;
+    // const label1 = "50,000"; const label2 = "100,000"; const label3 = "500,000"; const label4 = "1,000,000";
     // ============================================================
     
     // Calculate circle sizes using Flannery formula
     // scaleFactor makes circles smaller so they fit nicely in the legend
-    const scaleFactor = 0.4;  // 40% of actual map size
+    const scaleFactor = 0.5;  // 50% of actual map size for better visibility in legend
     
     // Apply Flannery formula: radius = (value/max)^0.57 × maxRadius × scaleFactor
-    const r1 = Math.pow(smallValue / maxPopulation, 0.57) * maxRadius * scaleFactor;
-    const r2 = Math.pow(mediumValue / maxPopulation, 0.57) * maxRadius * scaleFactor;
-    const r3 = Math.pow(largeValue / maxPopulation, 0.57) * maxRadius * scaleFactor;
+    // Each radius is calculated based on its population value
+    const r1 = Math.pow(value1 / maxPopulation, 0.57) * maxRadius * scaleFactor;
+    const r2 = Math.pow(value2 / maxPopulation, 0.57) * maxRadius * scaleFactor;
+    const r3 = Math.pow(value3 / maxPopulation, 0.57) * maxRadius * scaleFactor;
+    const r4 = Math.pow(value4 / maxPopulation, 0.57) * maxRadius * scaleFactor;
     
-    // Calculate SVG dimensions needed to fit all circles
-    const centerX = 70;  // X coordinate for circle centers
-    const svgHeight = r3 * 2 + r2 * 2 + r1 * 2 + 100;  // Total height with spacing
-    const svgWidth = Math.max(200, r3 * 2 + 120);       // Total width with label space
+    // Calculate SVG dimensions and positions
+    // All circles aligned at BOTTOM, centered horizontally
+    const svgWidth = r4 * 2 + 60;    // Width based on largest circle + margins
+    const svgHeight = r4 * 2 + 30;   // Height based on largest circle + space for labels
+    const centerX = svgWidth / 2;    // Center horizontally
+    const bottomY = svgHeight - 10;  // Bottom baseline position
+    
+    // Calculate Y positions - all circles sit on the same bottom baseline
+    const cy1 = bottomY - r1;  // Smallest circle
+    const cy2 = bottomY - r2;  // Medium circle
+    const cy3 = bottomY - r3;  // Large circle
+    const cy4 = bottomY - r4;  // Largest circle
     
     // Set SVG dimensions
     svg.setAttribute('width', svgWidth);
     svg.setAttribute('height', svgHeight);
     
-    // Calculate Y positions for circles (stack them from bottom to top)
-    const y3 = svgHeight - r3 - 20;      // Large circle at bottom
-    const y2 = y3 - r3 - r2 - 20;        // Medium circle in middle
-    const y1 = y2 - r2 - r1 - 20;        // Small circle at top
+    // Generate SVG content with FOUR NESTED circles
+    // 
+    // CRITICAL POSITIONING: All circles aligned at BOTTOM
+    // - Each circle's center Y position calculated so bottom edge touches baseline
+    // - All circles share same horizontal center (centerX)
+    // - Labels positioned ABOVE each circle (no dashed lines)
+    // - Largest circle drawn first = appears in back
+    // - Smallest circle drawn last = appears in front
+    //
+    // Each circle has:
+    // - fill="none" → No interior color, only outline visible
+    // - stroke="red" → Red outline color
+    // - stroke-width="1.5" → Medium thickness outline
+    //
+    // 🎨 NO COLOR BLENDING occurs because:
+    // - fill="none" means circles are transparent/empty inside
+    // - Only the strokes (outlines) are drawn
+    // - Strokes don't blend - each remains its own pure color
+    // - If we used fill="rgba(255,0,0,0.3)", overlapping areas would
+    //   become darker where multiple circles overlap
+    //
+    // 🗺️ STUDENTS: You can change circle outline color by modifying stroke="red"
+    // Examples:
+    //   - Blue: stroke="blue" or stroke="#0000FF"
+    //   - Green: stroke="green" or stroke="#00FF00"
+    //   - Black: stroke="black" or stroke="#000000"
+    //   - Custom: stroke="rgb(128, 0, 255)" for purple
     
-    // Generate SVG content with three circles and labels
-    // 🗺️ STUDENTS: You can change circle colors here by modifying fill and stroke values
     svg.innerHTML = `
-      <circle cx="${centerX}" cy="${y3}" r="${r3}" fill="rgba(255,0,0,${opacity})" stroke="red" stroke-width="1.5"/>
-      <text x="${centerX + r3 + 10}" y="${y3 + 5}" font-size="12" fill="#333">${largeLabel}</text>
+      <!-- Largest circle (100,000) - drawn FIRST so it appears in BACK -->
+      <circle cx="${centerX}" cy="${cy4}" r="${r4}" fill="none" stroke="red" stroke-width="1.5"/>
+      <text x="${centerX}" y="${cy4 - r4 - 5}" text-anchor="middle" font-size="11" fill="#333">${label4}</text>
       
-      <circle cx="${centerX}" cy="${y2}" r="${r2}" fill="rgba(255,0,0,${opacity})" stroke="red" stroke-width="1.5"/>
-      <text x="${centerX + r2 + 10}" y="${y2 + 5}" font-size="12" fill="#333">${mediumLabel}</text>
+      <!-- Large circle (50,000) -->
+      <circle cx="${centerX}" cy="${cy3}" r="${r3}" fill="none" stroke="red" stroke-width="1.5"/>
+      <text x="${centerX}" y="${cy3 - r3 - 5}" text-anchor="middle" font-size="11" fill="#333">${label3}</text>
       
-      <circle cx="${centerX}" cy="${y1}" r="${r1}" fill="rgba(255,0,0,${opacity})" stroke="red" stroke-width="1.5"/>
-      <text x="${centerX + r1 + 10}" y="${y1 + 5}" font-size="12" fill="#333">${smallLabel}</text>
+      <!-- Medium circle (10,000) -->
+      <circle cx="${centerX}" cy="${cy2}" r="${r2}" fill="none" stroke="red" stroke-width="1.5"/>
+      <text x="${centerX}" y="${cy2 - r2 - 5}" text-anchor="middle" font-size="11" fill="#333">${label2}</text>
+      
+      <!-- Smallest circle (1,000) - drawn LAST so it appears in FRONT -->
+      <circle cx="${centerX}" cy="${cy1}" r="${r1}" fill="none" stroke="red" stroke-width="1.5"/>
+      <text x="${centerX}" y="${cy1 - r1 - 5}" text-anchor="middle" font-size="11" fill="#333">${label1}</text>
     `;
     
-    console.log('Legend updated with radii:', r1.toFixed(1), r2.toFixed(1), r3.toFixed(1));
+    console.log('Legend updated with nested circles (bottom-aligned). Radii:', 
+                r1.toFixed(1), r2.toFixed(1), r3.toFixed(1), r4.toFixed(1));
   }
 
   // ============================================================
