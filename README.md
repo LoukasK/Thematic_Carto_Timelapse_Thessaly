@@ -87,7 +87,6 @@ Extensively documented for educational use with clear modification points:
 
 ## Documentation Highlights
 - **Inline Comments**: Over 500 lines of educational documentation explaining cartographic principles, code logic, and customization options
-- **Troubleshooting Guide**: Common issues and solutions included in HTML comments
 - **Line Number References**: Cross-references throughout code guide students to related sections
 - **Color Blending Explanation**: Detailed notes on how overlapping transparent circles interact visually
 
