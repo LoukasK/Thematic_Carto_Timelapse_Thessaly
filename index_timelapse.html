@@ -192,7 +192,7 @@
        🌍 STUDENTS: MODIFY THE TEXT BELOW TO CUSTOMIZE YOUR MAP'S TITLE AND CREDITS
        
        What to change:
-       1. Main title: Change "THESSALY POPULATION 1991 - 2021" to your study area and time period
+       1. Main title: Change "THESSALY POPULATION CHANGE 1991 - 2021" to your study area and time period
        2. Data source: Update "Hellenic Statistical Authority" to your actual data source
        3. Your name: Change "Loukas Katikas" to your name
        4. Institution: Update university, school, laboratory, course, and academic year
@@ -207,7 +207,7 @@
   <div class="legend-header-title">
     <!-- Main map title -->
     <div class="legend-map-title">
-      THESSALY POPULATION<br>
+      THESSALY POPULATION CHANGE<br>
       1991 - 2021
     </div>
     
@@ -425,11 +425,12 @@
    * 1. Fetch the population points GeoJSON file from DATA_PATH
    * 2. Fetch the boundary polygons GeoJSON file from BOUNDARIES_PATH
    * 3. Parse both JSON files
-   * 4. Calculate min/max population values
-   * 5. Add the boundary polygons to the map (underneath)
-   * 6. Add the circles to the map (on top)
-   * 7. Display the first year
-   * 8. Generate the legend
+   * 4. Sort population features by size (largest first) for proper rendering order
+   * 5. Calculate min/max population values
+   * 6. Add the boundary polygons to the map (underneath)
+   * 7. Add the circles to the map (on top)
+   * 8. Display the first year
+   * 9. Generate the legend
    * 
    * This function is called automatically when the map finishes loading
    */
@@ -460,6 +461,33 @@
       // Both files loaded successfully!
       console.log('Population data loaded successfully. Features:', populationData.features.length);
       console.log('Boundaries data loaded successfully. Features:', boundaryData.features.length);
+      
+      // ============================================================
+      // CRITICAL: SORT FEATURES BY POPULATION SIZE
+      // ============================================================
+      // 🎨 RENDERING ORDER CONTROL
+      // 
+      // MapLibre GL renders circle features in the order they appear in the GeoJSON.
+      // Without sorting, smaller circles might be drawn first and hidden behind larger ones.
+      // 
+      // Solution: Sort features by population (LARGEST FIRST)
+      // - Large circles drawn first → appear in back
+      // - Small circles drawn last → appear in front (on top)
+      // 
+      // This ensures smaller municipalities are always visible even when overlapping
+      // with larger ones, improving map readability.
+      //
+      // We use the FIRST year column to determine sorting order (assumes population
+      // rankings don't change dramatically across years)
+      // ============================================================
+      
+      populationData.features.sort((a, b) => {
+        const valA = parseFloat(a.properties[YEAR_COLUMNS[0]]) || 0;
+        const valB = parseFloat(b.properties[YEAR_COLUMNS[0]]) || 0;
+        return valB - valA;  // Descending order: largest first, smallest last
+      });
+      
+      console.log('Sorted features by population (largest first) for proper rendering order');
       
       // Store the data in our global variables
       geojsonData = populationData;
@@ -1206,16 +1234,19 @@
      
      1. Map loads → 'load' event fires (line ~929)
      2. loadData() called → Fetches BOTH GeoJSON files simultaneously
-     3. calculatePopulationRange() → Finds min/max values
-     4. addBoundariesLayer() → Creates boundary outlines (bottom layer)
-     5. addPopulationLayer() → Creates circles (top layer)
-     6. updateVisibleYear(0) → Shows first year
-     7. updateLegend() → Generates legend SVG
+     3. Population features SORTED by size (largest first) for rendering order
+     4. calculatePopulationRange() → Finds min/max values
+     5. addBoundariesLayer() → Creates boundary outlines (bottom layer)
+     6. addPopulationLayer() → Creates circles (top layer)
+     7. updateVisibleYear(0) → Shows first year
+     8. updateLegend() → Generates legend SVG
      
      Layer ordering (bottom to top):
      1. Basemap tiles
      2. Municipality boundaries (light grey outlines)
      3. Population circles (red circles with size representing population)
+        - Circles are sorted: LARGEST drawn first (back), SMALLEST drawn last (front)
+        - This ensures smaller circles always visible on top of larger ones
      
      User interactions:
      - Slider moved → updateVisibleYear() → Recalculates circles
@@ -1280,4 +1311,3 @@
 -->
 </body>
 </html>
-
